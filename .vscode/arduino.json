@@ -1,0 +1,5 @@
+{
+    "board": "anet:avr:anet",
+    "port": "COM4",
+    "sketch": "robot.ino"
+}
