@@ -2,9 +2,11 @@
 
 //Each Step is 1.8 degrees, and we are doing 1/16 steps
 int stepsPerRevolution = 200*16;
-int menuState;
+int menuState = 0;
+int menuSelectState = LOW;
 int buttonState;
 int directionState;
+int moveState = LOW;
 int adc_value;
 unsigned long lastRead=millis();
 unsigned long lastDisplayed=millis();
@@ -50,9 +52,6 @@ const int ADC_ENTER_VAL = 500;
 const int ADC_DOWN_VAL = 200;
 const int ADC_MENU_VAL = 300;
 
-//TODO sean delete this
-char snum[5];
-
 LiquidCrystal lcd(LCD_PINS_RS,
                   LCD_PINS_ENABLE,
                   LCD_PINS_D4,
@@ -71,11 +70,13 @@ void setup() {
   digitalWrite(LED_BUILTIN, HIGH);
   digitalWrite(XY_ENABLE_PIN, LOW);
   menuState = 0;
+  menuSelectState = LOW;
+  moveState = LOW;
 
   lcd.clear();
   lcd.begin(16,2);
   lcd.print("SD Robot Arm");
-  delayMicroseconds(2000);
+  delayMicroseconds(5000);
 }
 
 void displayMenu() {
@@ -84,27 +85,51 @@ void displayMenu() {
     lcd.clear();
     if (menuState == 0)
     {
-      lcd.print("Base");
+      lcd.print("1. Base");
+      if (menuSelectState == HIGH)
+      {
+        lcd.print(" - Selected");
+      }
     }
     if (menuState == 1)
     {
-      lcd.print("Lower Arm");
+      lcd.print("2. Lower Arm");
+      if (menuSelectState == HIGH)
+      {
+        lcd.print(" - Selected");
+      }
     }
     if (menuState == 2)
     {
-      lcd.print("Upper Arm");
+      lcd.print("3. Upper Arm");
+      if (menuSelectState == HIGH)
+      {
+        lcd.print(" - Selected");
+      }
     }
     if (menuState == 3)
     {
-      lcd.print("Wrist");
+      lcd.print("4. Wrist");
+      if (menuSelectState == HIGH)
+      {
+        lcd.print(" - Selected");
+      }
     }
     if (menuState == 4)
     {
-      lcd.print("Finger");
+      lcd.print("5. Finger");
+      if (menuSelectState == HIGH)
+      {
+        lcd.print(" - Selected");
+      }
     }
     if (menuState == 5)
     {
-      lcd.print("End");
+      lcd.print("6. End");
+      if (menuSelectState == HIGH)
+      {
+        lcd.print(" - Selected");
+      }
     }
     lastDisplayed = millis();
   }
@@ -113,35 +138,62 @@ void displayMenu() {
 void loop() { 
   adc_value = 0;
 
-  for (size_t i = 0; i < 40; i++)
+  for (size_t i = 0; i < 20; i++)
   {
     adc_value += analogRead(ADC_KEYPAD_PIN);
   }
-  adc_value = adc_value/40;
-
-  if ((adc_value>ADC_UP_VAL-50)&&(adc_value<ADC_UP_VAL+50)&&(millis()-lastRead>500))
+  adc_value = adc_value/20;
+/*   if (millis()-lastRead>500)
   {
-    menuState += 1;
-    menuState %= 6;
+    lcd.clear();
+    lcd.begin(16,2);
+    lcd.print(adc_value);
+    lastRead = millis();
+  } */
+
+  if ((adc_value>ADC_MENU_VAL-50)&&(adc_value<ADC_MENU_VAL+50)&&(millis()-lastRead>500))
+  {
+    menuSelectState = menuSelectState ? LOW: HIGH;
     lastRead = millis();
   }
-  if ((adc_value>ADC_BACK_VAL-50)&&(adc_value<ADC_BACK_VAL+50)&&(millis()-lastRead>500))
+  else if ((adc_value>ADC_UP_VAL-50)&&(adc_value<ADC_UP_VAL+50)&&(millis()-lastRead>500))
   {
+    if (menuState < 6)
+      menuState += 1;
+    else
+      menuState = 5;
+    menuState %= 6;
+    menuSelectState = LOW;
+    lastRead = millis();
   }
-  if ((adc_value>ADC_ENTER_VAL-50)&&(adc_value<ADC_ENTER_VAL+50)&&(millis()-lastRead>500))
+  else if ((adc_value>ADC_BACK_VAL-50)&&(adc_value<ADC_BACK_VAL+50)&&(millis()-lastRead>500))
   {
+    if (menuSelectState == HIGH)
+    {
+      directionState = LOW;
+      moveState = HIGH;
+      lastRead = millis();
+    }
+
   }
-  if ((adc_value>ADC_DOWN_VAL-50)&&(adc_value<ADC_DOWN_VAL+50)&&(millis()-lastRead>500))
+  else if ((adc_value>ADC_ENTER_VAL-50)&&(adc_value<ADC_ENTER_VAL+50)&&(millis()-lastRead>500))
+  {
+    if (menuSelectState == HIGH)
+    {
+      directionState = HIGH;
+      moveState = HIGH;
+      lastRead = millis();
+    }
+  }
+  else if ((adc_value>ADC_DOWN_VAL-50)&&(adc_value<ADC_DOWN_VAL+50)&&(millis()-lastRead>500))
   {
     if (menuState > 0)
       menuState -= 1;
     else
       menuState = 5;
     menuState %= 6;
+    menuSelectState = LOW;
     lastRead = millis();
-  }
-  if ((adc_value>ADC_MENU_VAL-50)&&(adc_value<ADC_MENU_VAL+50)&&(millis()-lastRead>500))
-  {
   }
 
   displayMenu();
@@ -158,5 +210,16 @@ void loop() {
       delayMicroseconds(500);
     }
     directionState = directionState ? LOW: HIGH;
+  }
+  if (moveState == HIGH)
+  {
+    for (int i = 0; i < stepsPerRevolution; i++)
+    {
+      digitalWrite(X_STEP_PIN, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(X_STEP_PIN, LOW);
+      delayMicroseconds(500);
+    }
+    moveState = LOW;
   }
 }
