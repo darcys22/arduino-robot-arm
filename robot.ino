@@ -2,10 +2,12 @@
 
 //Each Step is 1.8 degrees, and we are doing 1/16 steps
 int stepsPerRevolution = 200*16;
+int menuState;
 int buttonState;
 int directionState;
 int adc_value;
 unsigned long lastRead=millis();
+unsigned long lastDisplayed=millis();
 
 //
 // Limit Switches
@@ -42,6 +44,12 @@ const int LCD_PINS_D6 = 16;
 const int LCD_PINS_D7 = 17;
 const int ADC_KEYPAD_PIN = 1;
 
+const int ADC_UP_VAL = 700;
+const int ADC_BACK_VAL = 100;
+const int ADC_ENTER_VAL = 500;
+const int ADC_DOWN_VAL = 200;
+const int ADC_MENU_VAL = 300;
+
 //TODO sean delete this
 char snum[5];
 
@@ -62,11 +70,44 @@ void setup() {
   directionState = HIGH;
   digitalWrite(LED_BUILTIN, HIGH);
   digitalWrite(XY_ENABLE_PIN, LOW);
+  menuState = 0;
 
   lcd.clear();
   lcd.begin(16,2);
-  lcd.print("hello world");
+  lcd.print("SD Robot Arm");
+  delayMicroseconds(2000);
+}
 
+void displayMenu() {
+  if (millis() - lastDisplayed > 1000)
+  {
+    lcd.clear();
+    if (menuState == 0)
+    {
+      lcd.print("Base");
+    }
+    if (menuState == 1)
+    {
+      lcd.print("Lower Arm");
+    }
+    if (menuState == 2)
+    {
+      lcd.print("Upper Arm");
+    }
+    if (menuState == 3)
+    {
+      lcd.print("Wrist");
+    }
+    if (menuState == 4)
+    {
+      lcd.print("Finger");
+    }
+    if (menuState == 5)
+    {
+      lcd.print("End");
+    }
+    lastDisplayed = millis();
+  }
 }
 
 void loop() { 
@@ -77,28 +118,33 @@ void loop() {
     adc_value += analogRead(ADC_KEYPAD_PIN);
   }
   adc_value = adc_value/40;
-  if (millis()-lastRead>500)
+
+  if ((adc_value>ADC_UP_VAL-50)&&(adc_value<ADC_UP_VAL+50)&&(millis()-lastRead>500))
   {
-    lcd.clear();
-    lcd.begin(16,2);
-    if (adc_value > 0)
-    {
-      lcd.print("hello ");
-      itoa(adc_value, snum, 10);
-      lcd.print(snum);
-    } else {
-      lcd.print("nothing pressed");
-    }
+    menuState += 1;
+    menuState %= 6;
     lastRead = millis();
   }
-
-
-/*   if ((adc_value>VAL1-50)&&(adc_value<VAL1+50)&&(millis()-lastRead>300)
+  if ((adc_value>ADC_BACK_VAL-50)&&(adc_value<ADC_BACK_VAL+50)&&(millis()-lastRead>500))
   {
-    lcd.clear();
-    lcd.begin(16,2);
-    lcd.print("hello");
-  } */
+  }
+  if ((adc_value>ADC_ENTER_VAL-50)&&(adc_value<ADC_ENTER_VAL+50)&&(millis()-lastRead>500))
+  {
+  }
+  if ((adc_value>ADC_DOWN_VAL-50)&&(adc_value<ADC_DOWN_VAL+50)&&(millis()-lastRead>500))
+  {
+    if (menuState > 0)
+      menuState -= 1;
+    else
+      menuState = 5;
+    menuState %= 6;
+    lastRead = millis();
+  }
+  if ((adc_value>ADC_MENU_VAL-50)&&(adc_value<ADC_MENU_VAL+50)&&(millis()-lastRead>500))
+  {
+  }
+
+  displayMenu();
   
   digitalWrite(X_DIR_PIN, directionState);
   int button_state = digitalRead(X_STOP_PIN);
