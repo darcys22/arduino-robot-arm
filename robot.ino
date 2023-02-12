@@ -1,4 +1,5 @@
 #include <LiquidCrystal.h>
+#include "buttons.h"
 
 //Each Step is 1.8 degrees, and we are doing 1/16 steps
 int stepsPerRevolution = 200*16;
@@ -7,8 +8,6 @@ int menuSelectState = LOW;
 int buttonState;
 int directionState;
 int moveState = LOW;
-int adc_value;
-unsigned long lastRead=millis();
 unsigned long lastDisplayed=millis();
 
 //
@@ -46,11 +45,15 @@ const int LCD_PINS_D6 = 16;
 const int LCD_PINS_D7 = 17;
 const int ADC_KEYPAD_PIN = 1;
 
-const int ADC_UP_VAL = 700;
-const int ADC_BACK_VAL = 100;
-const int ADC_ENTER_VAL = 500;
-const int ADC_DOWN_VAL = 200;
-const int ADC_MENU_VAL = 300;
+// https://github.com/Klipper3d/klipper/issues/898
+// https://user-images.githubusercontent.com/28060331/49003751-e7a15880-f162-11e8-9f89-fd07c6de12ed.png
+const int ADC_UP_VAL = 696; //UP
+const int ADC_BACK_VAL = 93; // LEFT
+const int ADC_ENTER_VAL = 512; // RIGHT
+const int ADC_DOWN_VAL = 179; // DOWN
+const int ADC_MENU_VAL = 326; // CENTER
+
+const int ADC_DEFAULT_STATE = 1024; // CENTER
 
 LiquidCrystal lcd(LCD_PINS_RS,
                   LCD_PINS_ENABLE,
@@ -59,6 +62,8 @@ LiquidCrystal lcd(LCD_PINS_RS,
                   LCD_PINS_D6,
                   LCD_PINS_D7);
 
+int adc_value = ADC_DEFAULT_STATE;
+ADC_buttons display_buttons;
 
 void setup() { 
   pinMode(LED_BUILTIN, OUTPUT); 
@@ -73,10 +78,44 @@ void setup() {
   menuSelectState = LOW;
   moveState = LOW;
 
+  display_buttons.setup_button(ADC_MENU_VAL, [](){
+    menuSelectState = menuSelectState ? LOW: HIGH;
+  });
+  display_buttons.setup_button(ADC_UP_VAL, [](){
+    if (menuState < 5)
+      menuState += 1;
+    else
+      menuState = 0;
+    menuSelectState = LOW;
+  });
+  display_buttons.setup_button(ADC_DOWN_VAL, [](){
+    if (menuState > 0)
+      menuState -= 1;
+    else
+      menuState = 5;
+    menuSelectState = LOW;
+  });
+  display_buttons.setup_button(ADC_BACK_VAL, [](){
+    if (menuSelectState == HIGH)
+    {
+      directionState = LOW;
+      moveState = HIGH;
+    }
+  });
+  display_buttons.setup_button(ADC_ENTER_VAL, [](){
+    if (menuSelectState == HIGH)
+    {
+      directionState = HIGH;
+      moveState = HIGH;
+    }
+  });
+
+
   lcd.clear();
   lcd.begin(16,2);
   lcd.print("SD Robot Arm");
-  delayMicroseconds(5000);
+  delay(3000);
+
 }
 
 void displayMenu() {
@@ -136,65 +175,8 @@ void displayMenu() {
 }
 
 void loop() { 
-  adc_value = 0;
-
-  for (size_t i = 0; i < 20; i++)
-  {
-    adc_value += analogRead(ADC_KEYPAD_PIN);
-  }
-  adc_value = adc_value/20;
-/*   if (millis()-lastRead>500)
-  {
-    lcd.clear();
-    lcd.begin(16,2);
-    lcd.print(adc_value);
-    lastRead = millis();
-  } */
-
-  if ((adc_value>ADC_MENU_VAL-50)&&(adc_value<ADC_MENU_VAL+50)&&(millis()-lastRead>500))
-  {
-    menuSelectState = menuSelectState ? LOW: HIGH;
-    lastRead = millis();
-  }
-  else if ((adc_value>ADC_UP_VAL-50)&&(adc_value<ADC_UP_VAL+50)&&(millis()-lastRead>500))
-  {
-    if (menuState < 6)
-      menuState += 1;
-    else
-      menuState = 5;
-    menuState %= 6;
-    menuSelectState = LOW;
-    lastRead = millis();
-  }
-  else if ((adc_value>ADC_BACK_VAL-50)&&(adc_value<ADC_BACK_VAL+50)&&(millis()-lastRead>500))
-  {
-    if (menuSelectState == HIGH)
-    {
-      directionState = LOW;
-      moveState = HIGH;
-      lastRead = millis();
-    }
-
-  }
-  else if ((adc_value>ADC_ENTER_VAL-50)&&(adc_value<ADC_ENTER_VAL+50)&&(millis()-lastRead>500))
-  {
-    if (menuSelectState == HIGH)
-    {
-      directionState = HIGH;
-      moveState = HIGH;
-      lastRead = millis();
-    }
-  }
-  else if ((adc_value>ADC_DOWN_VAL-50)&&(adc_value<ADC_DOWN_VAL+50)&&(millis()-lastRead>500))
-  {
-    if (menuState > 0)
-      menuState -= 1;
-    else
-      menuState = 5;
-    menuState %= 6;
-    menuSelectState = LOW;
-    lastRead = millis();
-  }
+  adc_value = analogRead(ADC_KEYPAD_PIN);
+  display_buttons.handle_button(millis(), adc_value);
 
   displayMenu();
   
